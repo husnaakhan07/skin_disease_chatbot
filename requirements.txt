@@ -1,9 +1,37 @@
-langchain==0.3.26
-flask==3.1.1 
-sentence-transformers==4.1.0
-pypdf==5.6.1 
-python-dotenv==1.1.0
-langchain-pinecone==0.2.8 
-langchain-openai==0.3.24
-langchain-community==0.3.26
--e .
+# Core Framework
+flask
+python-dotenv
+
+# AI & LLM (Loosened for Resolution)
+langchain
+langchain-classic
+langchain-community
+langchain-groq
+langchain-pinecone
+langchain-huggingface
+langchain-text-splitters
+pinecone
+
+# Document Processing
+pypdf
+sentence-transformers
+
+# Multimodal & Audio
+Pillow
+opencv-python
+SpeechRecognition
+pyaudio
+kagglehub
+matplotlib
+seaborn
+pandas
+scikit-learn
+streamlit
+plotly
+google-generativeai
+google-genai
+Pillow
+ollama>=0.4.7
+torch
+torchvision
+tqdm
