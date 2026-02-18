@@ -83,9 +83,19 @@ if st.session_state.history:
 
 # --- 4. ANALYSIS INTERFACE ---
 if classes:
-    selected_class = st.selectbox("🎯 Target Category to Test:", classes)
-    class_path = TEST_DIR / selected_class
+
+    # Filter classes to only those present in test directory
+    available_classes = [c for c in classes if (TEST_DIR / c).exists()]
     
+    selected_class = None
+    if available_classes:
+        selected_class = st.selectbox("🎯 Target Category to Test:", classes)
+        class_path = TEST_DIR / selected_class
+
+    else:
+        st.error("No test data found for any model classes.")
+        class_path = Path("non_existent_path")
+        
     if class_path.exists():
         images = [f.name for f in class_path.iterdir() if f.suffix.lower() in ['.png', '.jpg', '.jpeg']]
         
