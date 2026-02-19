@@ -8,7 +8,7 @@ from PIL import Image
 
 # --- CONFIGURATION ---
 DATA_DIR = 'data' 
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 EPOCHS = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -58,7 +58,7 @@ class_names = image_datasets['train_data'].classes
 num_classes = len(class_names)
 
 # --- 2. MODEL SETUP ---
-model = models.resnet50(weights='IMAGENET1K_V1')
+model = models.resnet18(weights='IMAGENET1K_V1')
 num_ftrs = model.fc.in_features
 model.fc = nn.Linear(num_ftrs, num_classes)
 model = model.to(DEVICE)

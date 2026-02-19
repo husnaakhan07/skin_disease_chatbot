@@ -17,7 +17,7 @@ checkpoint = torch.load(MODEL_PATH)
 class_names = checkpoint['class_names']
 num_classes = len(class_names)
 
-model = models.resnet50()
+model = models.resnet18()
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 model.load_state_dict(checkpoint['model_state_dict'])
 model = model.to(DEVICE)
