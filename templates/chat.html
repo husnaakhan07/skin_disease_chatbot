@@ -3,7 +3,399 @@
 <head>
     <title>Medical AI Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Add Markdown CSS and library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .chat-card {
+            width: 95%;
+            max-width: 1200px;  /* Wider max width */
+            height: 90vh;
+            background: #000000;
+            border: 1px solid #333333;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-header {
+            background: #111111;
+            color: #ffffff;
+            padding: 20px 24px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            border-bottom: 1px solid #333333;
+            letter-spacing: 0.5px;
+        }
+
+        .chat-header i {
+            color: #007bff;
+            margin-right: 12px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Custom scrollbar */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #111111;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #444444;
+        }
+
+        .msg_container {
+            max-width: 85%;  /* Wider messages */
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-msg {
+            background: #007bff;
+            color: white;
+            border-radius: 18px 18px 5px 18px;
+            padding: 14px 18px;
+            margin-left: auto;
+            font-size: 1rem;
+            line-height: 1.5;
+            box-shadow: 0 2px 5px rgba(0, 123, 255, 0.3);
+        }
+
+        .bot-msg {
+            color: #ffffff;
+        }
+
+        /* Markdown styling */
+        .markdown-body {
+            background: #111111;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 1rem;
+            line-height: 1.6;
+            padding: 18px 22px;
+            border-radius: 18px 18px 18px 5px;
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.05);
+            border: 1px solid #222222;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3,
+        .markdown-body h4 {
+            color: #ffffff;
+            margin: 16px 0 8px 0;
+            font-weight: 600;
+        }
+
+        .markdown-body h1 { font-size: 1.8rem; border-bottom: 1px solid #333333; padding-bottom: 8px; }
+        .markdown-body h2 { font-size: 1.5rem; }
+        .markdown-body h3 { font-size: 1.3rem; }
+        .markdown-body h4 { font-size: 1.1rem; }
+
+        .markdown-body p {
+            margin: 10px 0;
+            color: #e0e0e0;
+        }
+
+        .markdown-body strong {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .markdown-body em {
+            color: #00ff88;
+        }
+
+        .markdown-body ul,
+        .markdown-body ol {
+            margin: 10px 0;
+            padding-left: 25px;
+            color: #e0e0e0;
+        }
+
+        .markdown-body li {
+            margin: 6px 0;
+        }
+
+        .markdown-body li::marker {
+            color: #007bff;
+        }
+
+        /* Table styling */
+        .markdown-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            background: #0a0a0a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #333333;
+        }
+
+        .markdown-body th {
+            background: #1a1a1a;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 2px solid #007bff;
+            font-size: 1.05rem;
+        }
+
+        .markdown-body td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #222222;
+            color: #e0e0e0;
+        }
+
+        .markdown-body tr:last-child td {
+            border-bottom: none;
+        }
+
+        .markdown-body tr:hover td {
+            background: #1a1a1a;
+        }
+
+        .markdown-body tr:nth-child(even) {
+            background: #0d0d0d;
+        }
+
+        /* When to seek medical attention styling */
+        .markdown-body h3:contains("When to seek medical attention"),
+        .markdown-body strong:contains("When to seek medical attention") {
+            color: #ff6b6b;
+            display: block;
+            margin-top: 20px;
+            padding: 10px;
+            background: #2a0000;
+            border-left: 4px solid #ff0000;
+            border-radius: 4px;
+        }
+
+        /* Audio player */
+        audio {
+            width: 100%;
+            margin-top: 12px;
+            border-radius: 30px;
+            background: #111111;
+        }
+
+        audio::-webkit-media-controls-panel {
+            background: #222222;
+        }
+
+        audio::-webkit-media-controls-current-time-display,
+        audio::-webkit-media-controls-time-remaining-display {
+            color: #ffffff;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            padding: 16px 22px;
+            background: #111111;
+            border-radius: 18px 18px 18px 5px;
+            width: fit-content;
+            border: 1px solid #222222;
+        }
+
+        .typing-indicator span {
+            height: 10px;
+            width: 10px;
+            background: #007bff;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 3px;
+            animation: typing 1.4s infinite;
+            opacity: 0.7;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+            30% { transform: translateY(-12px); opacity: 1; }
+        }
+
+        /* Input area */
+        .input-group {
+            display: flex;
+            align-items: center;
+            padding: 20px 24px;
+            background: #111111;
+            border-top: 1px solid #333333;
+            gap: 12px;
+        }
+
+        #textInput {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            color: #ffffff;
+            padding: 16px 20px;
+            border-radius: 40px;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        #textInput:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        }
+
+        #textInput::placeholder {
+            color: #666666;
+        }
+
+        .icon-btn {
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            color: #ffffff;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.3rem;
+        }
+
+        .icon-btn:hover {
+            background: #007bff;
+            border-color: #007bff;
+            transform: scale(1.05);
+        }
+
+        .icon-btn.speaking {
+            background: #ff4444;
+            border-color: #ff4444;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        #imageInput {
+            display: none;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .chat-card {
+                width: 100%;
+                height: 95vh;
+            }
+            
+            .msg_container {
+                max-width: 95%;
+            }
+            
+            .input-group {
+                padding: 15px;
+            }
+            
+            .icon-btn {
+                width: 48px;
+                height: 48px;
+                font-size: 1.2rem;
+            }
+        }
+
+        /* Special styling for warning messages */
+        .markdown-body .warning {
+            color: #ff6b6b;
+            background: #2a0000;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #ff0000;
+            margin: 16px 0;
+        }
+
+        /* Code blocks if any */
+        .markdown-body pre {
+            background: #1a1a1a;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #333333;
+            overflow-x: auto;
+        }
+
+        .markdown-body code {
+            background: #1a1a1a;
+            color: #00ff88;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Image styling */
+        .markdown-body img {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid #333333;
+        }
+
+        /* Blockquotes */
+        .markdown-body blockquote {
+            border-left: 4px solid #007bff;
+            padding: 8px 16px;
+            background: #1a1a1a;
+            margin: 16px 0;
+            color: #cccccc;
+        }
+    </style>
 </head>
 <body>
     <div class="chat-card">
@@ -11,25 +403,27 @@
             <i class="fas fa-hand-holding-medical"></i> MEDICAL AI ASSISTANT
         </div>
         
-        <div id="messageFormeight">
+        <div id="messageFormeight" class="chat-messages">
             <div class="msg_container bot-msg">
-                Hello! I am your AI medical assistant. You can type a question, upload a photo of a symptom, or use your voice.
+                <div class="markdown-body">
+                    Hello! I am your AI medical assistant. You can type a question, upload a photo of a symptom, or use your voice.
+                </div>
             </div>
         </div>
 
         <div class="input-group">
-            <label for="imageInput" class="icon-btn">
+            <label for="imageInput" class="icon-btn" title="Upload image">
                 <i class="fas fa-camera"></i>
             </label>
             <input type="file" id="imageInput" accept="image/*">
 
-            <input type="text" id="textInput" placeholder="Describe symptoms...">
+            <input type="text" id="textInput" placeholder="Describe symptoms..." autocomplete="off">
 
-            <button id="voiceBtn" class="icon-btn">
+            <button id="voiceBtn" class="icon-btn" title="Voice input">
                 <i class="fas fa-microphone"></i>
             </button>
 
-            <button id="sendBtn" class="icon-btn">
+            <button id="sendBtn" class="icon-btn" title="Send message">
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
@@ -40,73 +434,194 @@
         const voiceBtn = document.getElementById('voiceBtn');
         const textInput = document.getElementById('textInput');
         const imageInput = document.getElementById('imageInput');
+        const messageContainer = document.getElementById('messageFormeight');
 
-        // --- 1. VOICE RECORDING (Web Speech API) ---
+        // Configure marked for better rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false,
+            highlight: function(code) {
+                return code;
+            }
+        });
+
+        // --- 1. VOICE RECORDING ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.lang = 'en-US';
+            recognition.interimResults = false;
 
             voiceBtn.addEventListener('click', () => {
                 recognition.start();
-                voiceBtn.classList.add('speaking'); // Trigger CSS pulse
+                voiceBtn.classList.add('speaking');
+                voiceBtn.innerHTML = '<i class="fas fa-microphone-alt"></i>';
             });
 
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
                 textInput.value = transcript;
                 voiceBtn.classList.remove('speaking');
-                sendMessage(); // Auto-send after voice recognition
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                sendMessage();
             };
 
-            recognition.onerror = () => voiceBtn.classList.remove('speaking');
+            recognition.onerror = () => {
+                voiceBtn.classList.remove('speaking');
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            };
+            
+            recognition.onend = () => {
+                voiceBtn.classList.remove('speaking');
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            };
+        } else {
+            voiceBtn.style.display = 'none';
         }
 
-        // --- 2. SEND MESSAGE LOGIC ---
+        // Image input handler
+        imageInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                textInput.placeholder = `📷 Image selected: ${this.files[0].name}`;
+            } else {
+                textInput.placeholder = "Describe symptoms...";
+            }
+        });
+
+        // --- 2. TYPING INDICATOR ---
+        function showTypingIndicator() {
+            const typingHtml = `
+                <div class="msg_container bot-msg" id="typingIndicator">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+            $("#messageFormeight").append(typingHtml);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            $("#typingIndicator").remove();
+        }
+
+        function scrollToBottom() {
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        // --- 3. SEND MESSAGE ---
         function sendMessage() {
-            const msg = textInput.value;
+            const msg = textInput.value.trim();
             const file = imageInput.files[0];
 
             if (!msg && !file) return;
 
-            // Append User Message to UI
-            const userHtml = `<div class="msg_container user-msg">${msg || "Sent an image..."}</div>`;
+            // User message
+            const userMessage = msg || (file ? "📷 Sent an image..." : "");
+            const userHtml = `<div class="msg_container user-msg">${escapeHtml(userMessage)}</div>`;
             $("#messageFormeight").append(userHtml);
+            
             textInput.value = "";
+            textInput.placeholder = "Describe symptoms...";
+            imageInput.value = "";
+            
+            scrollToBottom();
+            showTypingIndicator();
 
-            // Prepare Form Data
             const formData = new FormData();
-            formData.append("msg", msg);
+            formData.append("msg", msg || "");
             if (file) formData.append("image", file);
 
-            // AJAX Request to Flask
             $.ajax({
                 type: "POST",
                 url: "/get",
                 data: formData,
                 processData: false,
                 contentType: false,
+                timeout: 60000,
                 success: function(data) {
-                    // Append Bot Response
-                    const botHtml = `<div class="msg_container bot-msg">${data.answer}</div>`;
+                    removeTypingIndicator();
+                    
+                    // Parse markdown and append bot response
+                    const botHtml = `
+                        <div class="msg_container bot-msg">
+                            <div class="markdown-body">
+                                ${marked.parse(data.answer || "No response received")}
+                            </div>
+                        </div>
+                    `;
                     $("#messageFormeight").append(botHtml);
 
-                    // Auto-play Groq TTS Audio
+                    // Auto-play audio
                     if (data.audio_url) {
                         const audio = new Audio(data.audio_url);
-                        audio.play();
+                        audio.play().catch(e => console.log('Audio playback failed:', e));
+                        
+                        // Add audio player
+                        $(botHtml).find('.msg_container').append(`
+                            <audio controls src="${data.audio_url}" style="margin-top: 12px;"></audio>
+                        `);
                     }
 
-                    // Scroll to bottom
-                    $("#messageFormeight").scrollTop($("#messageFormeight")[0].scrollHeight);
-                    imageInput.value = ""; // Clear file input
+                    scrollToBottom();
+                },
+                error: function(xhr, status, error) {
+                    removeTypingIndicator();
+                    
+                    const errorHtml = `
+                        <div class="msg_container bot-msg">
+                            <div class="markdown-body" style="color: #ff6b6b;">
+                                Sorry, I encountered an error. Please try again.
+                            </div>
+                        </div>
+                    `;
+                    $("#messageFormeight").append(errorHtml);
+                    scrollToBottom();
                 }
             });
         }
 
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Event listeners
         document.getElementById('sendBtn').addEventListener('click', sendMessage);
-        textInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+        
+        textInput.addEventListener('keypress', (e) => { 
+            if(e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(); 
+            }
+        });
+
+        // Paste image handler
+        textInput.addEventListener('paste', function(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.type.indexOf('image') === 0) {
+                    const file = item.getAsFile();
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    imageInput.files = dataTransfer.files;
+                    textInput.placeholder = `📋 Image pasted: ${file.name}`;
+                    e.preventDefault();
+                    break;
+                }
+            }
+        });
+
+        scrollToBottom();
     </script>
 </body>
 </html>
