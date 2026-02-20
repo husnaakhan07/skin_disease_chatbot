@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 "static/audio/*.wav" 
 "static/uploads/" 
+"static/audio/" 
+"static/uploads/" 
+"*.wav" 
+"test_unknown.txt" 
+"tracked_unknown.txt" 
