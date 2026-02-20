@@ -212,3 +212,8 @@ __marimo__/
 "*.wav" 
 "test_unknown.txt" 
 "tracked_unknown.txt" 
+"check.py" 
+"test_unknown.txt" 
+"tracked_unknown.txt" 
+"static/uploads/" 
+"static/audio/" 
