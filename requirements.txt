@@ -4,6 +4,7 @@ python-dotenv
 
 # AI & LLM (Loosened for Resolution)
 langchain
+langchain-core
 langchain-classic
 langchain-community
 langchain-groq
@@ -11,6 +12,7 @@ langchain-pinecone
 langchain-huggingface
 langchain-text-splitters
 pinecone
+
 
 # Document Processing
 pypdf
@@ -35,3 +37,5 @@ ollama>=0.4.7
 torch
 torchvision
 tqdm
+numpy
+sympy
