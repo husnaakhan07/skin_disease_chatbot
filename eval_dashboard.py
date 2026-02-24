@@ -28,7 +28,7 @@ def load_custom_model():
     class_names = checkpoint['class_names']
     
     # Reconstruct architecture
-    model = models.resnet50()
+    model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, len(class_names))
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
