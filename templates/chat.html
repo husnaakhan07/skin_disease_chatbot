@@ -637,6 +637,10 @@
             <input type="file" id="imageInput" accept="image/*">
 
             <input type="text" id="textInput" placeholder="Describe symptoms or ask about the image..." autocomplete="off">
+            
+            <button id="muteBtn" class="icon-btn" title="Mute audio">
+                <i id="muteIcon" class="fa-solid fa-volume-high"></i>
+            </button>
 
             <button id="voiceBtn" class="icon-btn" title="Voice input">
                 <i class="fas fa-microphone"></i>
@@ -652,6 +656,7 @@
     <script>
         const voiceBtn = document.getElementById('voiceBtn');
         const textInput = document.getElementById('textInput');
+        const muteInput = document.getElementById('muteBtn');
         const imageInput = document.getElementById('imageInput');
         const messageContainer = document.getElementById('messageFormeight');
         const imagePreviewArea = document.getElementById('imagePreviewArea');
@@ -931,6 +936,35 @@
                 sendMessage(); 
             }
         });
+
+        // Mute button
+        function updateMute(){
+            let mute = false;
+            icon = document.getElementById('muteIcon');
+            if (icon.className == "fa-solid fa-volume-high") {
+                icon.className = "fa-solid fa-volume-xmark";
+                mute = true;
+            }
+            else {
+                icon.className = "fa-solid fa-volume-high";
+                mute = false;
+            }
+            // Send update
+            $.ajax({
+                type: "POST",
+                url: "/mute",
+                contentType: 'application/json',
+                data: JSON.stringify({ 'isActive': mute }),
+                success: function(response) {
+                    console.log("Success:", response);
+                },
+                error: function(error) {
+                    console.log("Error:", error);
+                }
+            });
+
+        }
+        muteBtn.addEventListener('click', updateMute);
 
         // Make showFullImage globally available
         window.showFullImage = showFullImage;
