@@ -89,8 +89,14 @@ if classes:
     
     selected_class = None
     if available_classes:
-        selected_class = st.selectbox("🎯 Target Category to Test:", classes)
+        selected_class = st.selectbox("🎯 Target Category to Test:", available_classes)
         class_path = TEST_DIR / selected_class
+
+        # Clear stale state when user switches class
+        if st.session_state.get('current_class') != selected_class:
+            st.session_state.current_class = selected_class
+            st.session_state.current_img = None
+            st.session_state.last_prediction = None
 
     else:
         st.error("No test data found for any model classes.")
@@ -100,11 +106,11 @@ if classes:
         images = [f.name for f in class_path.iterdir() if f.suffix.lower() in ['.png', '.jpg', '.jpeg']]
         
         if images:
-            if 'current_img' not in st.session_state or st.button("🔄 Shuffle New Sample"):
+            if not st.session_state.get('current_img') or st.button("🔄 Shuffle New Sample"):
                 st.session_state.current_img = random.choice(images)
                 st.session_state.last_prediction = None
 
-            img_path = (class_path / st.session_state.current_img).resolve()
+            img_path = class_path / st.session_state.current_img
             col_img, col_info = st.columns([1, 1.5]) 
             
             with col_img:
@@ -128,26 +134,47 @@ if classes:
                     else:
                         st.error(f"**AI PREDICTION:** {st.session_state.last_prediction} ❌")
 
-    # --- 5. PER-CLASS RELIABILITY (TP, TN, FP, FN) ---
-    if st.session_state.history:
-        df = pd.DataFrame(st.session_state.history)
-        
-        # Binary Classification Logic for the Selected Class:
-        # TP: Actual is target, Predicted is target
-        tp = len(df[(df['Actual'] == selected_class) & (df['Predicted'] == selected_class)])
-        # FN: Actual is target, Predicted is NOT target
-        fn = len(df[(df['Actual'] == selected_class) & (df['Predicted'] != selected_class)])
-        # FP: Actual is NOT target, Predicted is target
-        fp = len(df[(df['Actual'] != selected_class) & (df['Predicted'] == selected_class)])
-        # TN: Actual is NOT target, Predicted is NOT target
-        tn = len(df[(df['Actual'] != selected_class) & (df['Predicted'] != selected_class)])
+# --- 5. PER-CLASS RELIABILITY (TP, TN, FN, FP per class) ---
+if st.session_state.history:
+    df = pd.DataFrame(st.session_state.history)
 
+    rows = []
+    for cls in sorted(df['Actual'].unique()):
+        class_df = df[df['Actual'] == cls]
+        total = len(class_df)
+        tp = len(class_df[class_df['Predicted'] == cls])
+        fn = len(class_df[class_df['Predicted'] != cls])
+        fp = len(df[(df['Actual'] != cls) & (df['Predicted'] == cls)])
+        tn = len(df[(df['Actual'] != cls) & (df['Predicted'] != cls)])
+        accuracy = (tp / total) * 100 if total > 0 else 0
+
+        rows.append({
+            "Class": cls,
+            "Total Tested": total,
+            "✅ TP (Correct)": tp,
+            "🛡️ TN (Correct Rejections)": tn,
+            "⚠️ FP (False Alarm)": fp,
+            "❌ FN (Missed)": fn,
+            "🎯 Accuracy": f"{accuracy:.1f}%"
+        })
+
+    summary_df = pd.DataFrame(rows)
+
+    # Selected class stats FIRST
+    if selected_class in df['Actual'].values:
+        selected_row = summary_df[summary_df['Class'] == selected_class].iloc[0]
         st.markdown(f"<p class='header-text'>Category Stats: {selected_class.upper()}</p>", unsafe_allow_html=True)
+
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("✅ TP (Correct Hits)", tp)
-        m2.metric("🛡️ TN (Correct Rejections)", tn)
-        m3.metric("⚠️ FP (False Alarms)", fp)
-        m4.metric("❌ FN (Misses)", fn)
+        m1.metric("✅ TP (Correct Hits)", selected_row['✅ TP (Correct)'])
+        m2.metric("🛡️ TN (Correct Rejections)", selected_row['🛡️ TN (Correct Rejections)'])
+        m3.metric("⚠️ FP (False Alarms)", selected_row['⚠️ FP (False Alarm)'])
+        m4.metric("❌ FN (Misses)", selected_row['❌ FN (Missed)'])
+
+    # Per-class table AFTER
+    st.markdown("<p class='header-text'>📊 Per-Class Performance Breakdown</p>", unsafe_allow_html=True)
+    st.dataframe(summary_df, use_container_width=True)
+
 
 # --- 6. LOGS & ADMIN ---
 if st.session_state.history:
