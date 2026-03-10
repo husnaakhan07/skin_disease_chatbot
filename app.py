@@ -42,6 +42,12 @@ MAX_TTS_RETRIES = 3
 for folder in ["static/audio", "static/uploads"]:
     os.makedirs(folder, exist_ok=True)
 
+# Enable/Disable Text-to-Speech
+tts_status = False
+
+# Text-to-Speech Modifier (Should be in brackets [])
+tts_modifier = "[quick]"
+
 # --- 2. LOAD YOUR TRAINED SKIN DISEASE MODEL ---
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 skin_model = None
@@ -292,7 +298,7 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
             audio_response = groq_client.audio.speech.create(
                 model="canopylabs/orpheus-v1-english",
                 voice="troy",
-                input=tts_text,
+                input=tts_modifier + tts_text,
                 response_format="wav"
             )
             audio_response.write_to_file(audio_path)
@@ -453,9 +459,11 @@ def chat():
         final_answer = clean_response_for_display(final_answer)
         
         try:
-            audio_filename = generate_speech_safe(final_answer)
-            if audio_filename:
-                audio_url = url_for('static', filename=f'audio/{audio_filename}')
+            global tts_status
+            if tts_status == False:
+                audio_filename = generate_speech_safe(final_answer)
+                if audio_filename:
+                    audio_url = url_for('static', filename=f'audio/{audio_filename}')
         except Exception as tts_error:
             print(f"TTS error: {tts_error}")
         
@@ -497,6 +505,16 @@ def status():
         "skin_model_loaded": skin_model is not None,
         "skin_classes": len(skin_class_names) if skin_class_names else 0
     })
+
+@app.route("/mute", methods=["POST"])
+def mute():
+    try:
+        global tts_status
+        tts_status = bool(request.json.get("isActive"))
+        print(f"Received Mute Status: {tts_status}")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == '__main__':
     cleanup_old_audio_files()
