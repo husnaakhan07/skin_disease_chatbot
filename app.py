@@ -124,9 +124,9 @@ try:
     skin_class_names = checkpoint['class_names']
     num_classes = len(skin_class_names)
     
-    print(f"✅ Skin disease model loaded successfully")
-    print(f"📊 Number of classes: {num_classes}")
-    print(f"🏷️ Classes: {skin_class_names[:10]}...")
+    print(f" Skin disease model loaded successfully")
+    print(f" Number of classes: {num_classes}")
+    print(f" Classes: {skin_class_names[:10]}...")
     
     # Use ResNet18
     skin_model = models.resnet18(weights=None)
@@ -136,10 +136,10 @@ try:
     skin_model = skin_model.to(DEVICE)
     skin_model.eval()
     
-    print(f"✅ Model ready on {DEVICE}")
+    print(f" Model ready on {DEVICE}")
     
 except Exception as e:
-    print(f"⚠️ Could not load skin disease model: {e}")
+    print(f" Could not load skin disease model: {e}")
     print("   Will use vision model as fallback")
 
 # Image transform for skin model
@@ -518,8 +518,8 @@ def mute():
 
 if __name__ == '__main__':
     cleanup_old_audio_files()
-    print("🚀 Medical AI Assistant starting...")
-    print(f"🧠 Skin model loaded: {skin_model is not None}")
+    print(" Medical AI Assistant starting...")
+    print(f" Skin model loaded: {skin_model is not None}")
     if skin_class_names:
         print(f"🩺 Can detect: {len(skin_class_names)} conditions")
     app.run(host="0.0.0.0", port=8080, debug=True)
