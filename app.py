@@ -378,18 +378,26 @@ def chat():
                         
                         # Store the detected disease for follow-up questions
                         set_session_disease(session_id, primary_disease_raw)
-                        
+             
+                        # To display an image, it MUST be in the /static folder
+                        top_results_path = "./static/top_results/"
+
                         # Format response
                         formatted_response = f"🔍 **Skin Analysis Result:**\n\n"
                         formatted_response += f"**Primary Detection:** {primary_disease}\n"
                         formatted_response += f"**Confidence:** {primary_confidence:.1f}%\n\n"
                         formatted_response += f"**Top 3 possibilities:**\n"
-                        
+
                         for i, (prob, idx) in enumerate(zip(top3_prob, top3_idx), 1):
                             disease_raw = skin_class_names[idx.item()]
                             disease = get_pretty_disease_name(disease_raw)
                             conf = prob.item() * 100
                             formatted_response += f"{i}. {disease} ({conf:.1f}%)\n"
+                            # Attach example image of disease
+                            top_image_filename = "".join(os.listdir(top_results_path + str(disease_raw).lower()))
+                            top_image_path = top_results_path + str(disease_raw).lower() + "/" + top_image_filename
+                            formatted_response += f"<img src='{top_image_path}' class=\"top-result\">"
+                            formatted_response += "<br>"
                         
                         final_answer = formatted_response
                         
