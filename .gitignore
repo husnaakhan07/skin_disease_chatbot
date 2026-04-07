@@ -1,8 +1,24 @@
-venv/
+# Virtual environment
+medibot/
+
+# Python cache
 __pycache__/
-*.DS_Store
+*.pyc
+
+# Env files
+.env
+
+# Audio / generated files
+*.wav
+static/audio/
+
+# Build files
+*.egg-info/
+
+# Temporary scripts
+check_dup.py
+move_all_datasets.py
+
+# OS files
 .DS_Store
-.history/
-.env 
-"move_all_datasets.py" 
-move_all_datasets.py 
+Thumbs.db
