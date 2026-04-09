@@ -9,7 +9,7 @@ from PIL import Image
 # --- CONFIGURATION ---
 DATA_DIR = 'data' 
 BATCH_SIZE = 4
-EPOCHS = 5
+EPOCHS = 8
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Now 'transforms' is defined and safe to use!
