@@ -39,3 +39,4 @@ torchvision
 tqdm
 numpy
 sympy
+pyttsx3
