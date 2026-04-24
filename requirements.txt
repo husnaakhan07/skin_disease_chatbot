@@ -1,42 +1,40 @@
-# Core Framework
 flask
 python-dotenv
 
-# AI & LLM (Loosened for Resolution)
 langchain
 langchain-core
-langchain-classic
 langchain-community
+langchain-text-splitters
 langchain-groq
 langchain-pinecone
 langchain-huggingface
-langchain-text-splitters
+
 pinecone
-
-
-# Document Processing
 pypdf
 sentence-transformers
 
-# Multimodal & Audio
-Pillow
+pillow
 opencv-python
-SpeechRecognition
+speechrecognition
 pyaudio
-kagglehub
+
 matplotlib
 seaborn
 pandas
 scikit-learn
 streamlit
 plotly
+
 google-generativeai
 google-genai
-Pillow
+
 ollama>=0.4.7
-torch
-torchvision
+
+torch>=2.4.0
+torchvision>=0.19.0
+numpy<2
+
 tqdm
-numpy
 sympy
 pyttsx3
+kagglehub

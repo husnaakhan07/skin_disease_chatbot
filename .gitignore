@@ -22,3 +22,12 @@ move_all_datasets.py
 # OS files
 .DS_Store
 Thumbs.db
+venv/
+static/uploads/
+static/audio/
+static/admin_uploads/
+data/admin_logs.json
+__pycache__/
+*.pyc
+.DS_Store
+.env
