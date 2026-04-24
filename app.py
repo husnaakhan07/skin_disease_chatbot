@@ -30,7 +30,7 @@ load_dotenv()
 # --- ADMIN DATA STORAGE ---
 prediction_history = []
 
-# --- 1. CONFIGURATION & DIRECTORIES ---
+#  CONFIGURATION & DIRECTORIES ---
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DermAI Admin Dashboard</title>
+  <style>
+    :root {
+      --primary: #1a2a6c;
+      --primary-soft: #eef2ff;
+      --bg1: #f5f7fa;
+      --bg2: #c3cfe2;
+      --card: #ffffff;
+      --text: #1a2a6c;
+      --muted: #667085;
+      --success: #138a36;
+      --danger: #b42318;
+      --warning: #b54708;
+      --border: #d1d8e0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1450px;
+      margin: 24px auto 48px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 8px 0 6px;
+      color: var(--primary);
+    }
+
+    .subtitle {
+      text-align: center;
+      margin: 0 0 22px;
+      color: var(--muted);
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn, button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 18px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(26, 42, 108, 0.15);
+    }
+
+    .tab-btn.secondary, button.secondary {
+      background: white;
+      color: var(--primary);
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .tab-section { display: none; }
+    .tab-section.active { display: block; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .metric-title {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .section-title {
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .live-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .case-card img {
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+      border-radius: 12px;
+      background: #eef2ff;
+      border: 1px solid var(--border);
+    }
+
+    .case-info {
+      margin-top: 12px;
+      line-height: 1.6;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .pill.admin {
+      background: #fff4e5;
+      color: var(--warning);
+    }
+
+    .evaluation-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.45fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .specimen-img {
+      width: 100%;
+      max-height: 430px;
+      object-fit: contain;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: end;
+    }
+
+    select {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      color: var(--primary);
+      background: white;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .diagnostic-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .result-success { color: var(--success); font-weight: 800; }
+    .result-danger { color: var(--danger); font-weight: 800; }
+    .result-muted { color: var(--muted); font-weight: 700; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #edf0f5;
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--primary);
+      color: white;
+    }
+
+    .audit-wrap {
+      margin-top: 22px;
+    }
+
+    .empty-state {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: #ffffffaa;
+    }
+
+    .upload-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    .upload-box {
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      background: #ffffffaa;
+    }
+
+    .upload-box input[type="file"], .upload-box textarea {
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 12px;
+    }
+
+    .upload-box textarea {
+      min-height: 76px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .admin-preview {
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      display: none;
+    }
+
+    .quick-result {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 160px;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 900px) {
+      .evaluation-layout, .control-row, .upload-panel { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>DermAI Admin Dashboard</h1>
+    <p class="subtitle"></p>
+
+    <div class="tabs">
+      <button id="liveTabBtn" class="tab-btn active" onclick="showTab('live')">Live User Cases</button>
+      <button id="evalTabBtn" class="tab-btn secondary" onclick="showTab('evaluation')">Model Evaluation</button>
+    </div>
+
+    <section id="liveSection" class="tab-section active">
+      <div class="metrics">
+        <div class="card">
+          <div class="metric-title">Live Uploaded Cases</div>
+          <div class="metric-value" id="liveTotalCases">0</div>
+        </div>
+        <div class="card">
+          <div class="metric-title">Latest Prediction</div>
+          <div class="metric-value" id="liveLatestPrediction">-</div>
+        </div>
+        <div class="card">
+          <div class="metric-title">Latest Confidence</div>
+          <div class="metric-value" id="liveLatestConfidence">-</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Upload Live Image Test</div>
+        <div class="upload-panel">
+          <div class="upload-box">
+            <label for="adminLiveImage"><strong>Choose skin image</strong></label>
+            <input id="adminLiveImage" type="file" accept="image/*" onchange="previewAdminUpload(event)" />
+            <label for="adminLiveMsg"><strong>Optional question</strong></label>
+            <textarea id="adminLiveMsg" placeholder="Optional: e.g., What are the symptoms or treatment?"></textarea>
+            <button onclick="runAdminLivePrediction()">Predict Live Image</button>
+          </div>
+          <div>
+            <img id="adminUploadPreview" class="admin-preview" alt="Selected image preview" />
+            <div id="adminLiveResult" class="quick-result" style="margin-top:12px;">
+              Upload an image here to check a live prediction directly from the admin dashboard.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Live User Cases</div>
+        <div class="tabs" style="justify-content:flex-start; margin-bottom:16px;">
+          <button onclick="loadLiveCases()">Refresh Live Cases</button>
+          <button onclick="clearLiveCases()" class="tab-btn secondary">Clear Live Cases</button>
+        </div>
+        <div id="liveCasesGrid" class="live-grid"></div>
+      </div>
+    </section>
+
+    <section id="evaluationSection" class="tab-section">
+      <div class="metrics">
+        <div class="card">
+          <div class="metric-title">Total Samples Tested</div>
+          <div class="metric-value" id="evalTotalSamples">0</div>
+        </div>
+        <div class="card">
+          <div class="metric-title">Correct Predictions</div>
+          <div class="metric-value" id="evalCorrectPredictions">0</div>
+        </div>
+        <div class="card">
+          <div class="metric-title">Global Accuracy</div>
+          <div class="metric-value" id="evalGlobalAccuracy">0%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Pathology Validator</div>
+        <div class="control-row">
+          <div>
+            <label for="classSelect">Target Category to Test</label>
+            <select id="classSelect"></select>
+          </div>
+          <button onclick="shuffleEvaluationSample()">🔄 Shuffle New Sample</button>
+          <button onclick="runSelectedEvaluation()"> Run AI Analysis</button>
+        </div>
+
+        <div class="evaluation-layout">
+          <div>
+            <div class="section-title">Specimen View</div>
+            <img id="evalImage" class="specimen-img" src="" alt="No specimen selected" />
+          </div>
+          <div>
+            <div class="section-title">AI Diagnostic</div>
+            <div class="diagnostic-box">
+              <p><strong>Ground Truth Label:</strong> <span id="evalGroundTruth">-</span></p>
+              <p><strong>AI Prediction:</strong> <span id="evalPrediction" class="result-muted">Run analysis</span></p>
+              <p><strong>Confidence:</strong> <span id="evalConfidence">-</span></p>
+              <p><strong>Result:</strong> <span id="evalResult" class="result-muted">Pending</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card audit-wrap">
+        <div class="section-title">📊 Model Evaluation Results</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Total Tested</th>
+              <th>✅ TP</th>
+              <th>🛡️ TN</th>
+              <th>⚠️ FP</th>
+              <th>❌ FN</th>
+              <th>🎯 Accuracy</th>
+            </tr>
+          </thead>
+          <tbody id="evalStatsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card audit-wrap">
+        <div class="section-title">Historical Audit Log</div>
+        <div class="tabs" style="justify-content:flex-start; margin-bottom:16px;">
+          <button onclick="loadEvaluationSummary()">Refresh Evaluation</button>
+          <button onclick="clearEvaluationHistory()" class="tab-btn secondary">Reset Evaluation Metrics</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Actual</th>
+              <th>Predicted</th>
+              <th>Confidence</th>
+              <th>Correct?</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="evalHistoryBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let evalClasses = [];
+    let currentEvalSample = null;
+
+    function showTab(tab) {
+      const live = tab === 'live';
+      document.getElementById('liveSection').classList.toggle('active', live);
+      document.getElementById('evaluationSection').classList.toggle('active', !live);
+      document.getElementById('liveTabBtn').classList.toggle('active', live);
+      document.getElementById('liveTabBtn').classList.toggle('secondary', !live);
+      document.getElementById('evalTabBtn').classList.toggle('active', !live);
+      document.getElementById('evalTabBtn').classList.toggle('secondary', live);
+
+      if (!live) {
+        loadEvaluationClasses();
+        loadEvaluationSummary();
+      }
+    }
+
+    function previewAdminUpload(event) {
+      const file = event.target.files[0];
+      const preview = document.getElementById("adminUploadPreview");
+
+      if (!file) {
+        preview.style.display = "none";
+        preview.src = "";
+        return;
+      }
+
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = "block";
+    }
+
+    async function runAdminLivePrediction() {
+      const fileInput = document.getElementById("adminLiveImage");
+      const msgInput = document.getElementById("adminLiveMsg");
+      const resultBox = document.getElementById("adminLiveResult");
+
+      if (!fileInput.files.length) {
+        resultBox.innerHTML = "⚠️ Please choose an image first.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", fileInput.files[0]);
+      formData.append("msg", msgInput.value || "");
+      formData.append("source", "Admin Live Test");
+
+      resultBox.innerHTML = "⏳ Running AI prediction...";
+
+      try {
+        const res = await fetch("/get", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+
+        resultBox.innerHTML = `
+✅ Prediction completed.
+
+${data.answer || "No response returned."}
+        `;
+
+        loadLiveCases();
+
+      } catch (error) {
+        resultBox.innerHTML = "❌ Prediction failed. Check Flask terminal logs.";
+        console.error(error);
+      }
+    }
+
+    async function loadLiveCases() {
+      const res = await fetch('/admin/data');
+      const data = await res.json();
+      const history = data.history || [];
+      const latest = history.length ? history[history.length - 1] : null;
+
+      document.getElementById('liveTotalCases').textContent = data.total_samples ?? history.length;
+      document.getElementById('liveLatestPrediction').textContent = latest?.PrettyPredicted || latest?.Predicted || '-';
+      document.getElementById('liveLatestConfidence').textContent = latest?.Confidence || '-';
+
+      const grid = document.getElementById('liveCasesGrid');
+      grid.innerHTML = '';
+
+      if (!history.length) {
+        grid.innerHTML = '<div class="empty-state">No live user cases yet. Upload an image from the user dashboard or from the admin live test.</div>';
+        return;
+      }
+
+      history.slice().reverse().forEach(item => {
+        const source = item.Source || 'User Chatbot';
+        const pillClass = source.includes('Admin') ? 'pill admin' : 'pill';
+        grid.innerHTML += `
+          <div class="card case-card">
+            ${item.ImagePath ? `<img src="${item.ImagePath}" alt="Uploaded case" />` : '<div class="empty-state">No image</div>'}
+            <div class="case-info">
+              <div><strong>Prediction:</strong> ${item.PrettyPredicted || item.Predicted || '-'}</div>
+              <div><strong>Raw Label:</strong> ${item.Predicted || '-'}</div>
+              <div><strong>Confidence:</strong> ${item.Confidence || '-'}</div>
+              <div><strong>Timestamp:</strong> ${item.Timestamp || '-'}</div>
+              <span class="${pillClass}">${source}</span>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    async function clearLiveCases() {
+      await fetch('/admin/clear', { method: 'POST' });
+      loadLiveCases();
+    }
+
+    async function loadEvaluationClasses() {
+      const res = await fetch('/admin/evaluation/classes');
+      const data = await res.json();
+      evalClasses = data.classes || [];
+
+      const select = document.getElementById('classSelect');
+      select.innerHTML = '';
+
+      if (!evalClasses.length) {
+        select.innerHTML = '<option value="">No classes found</option>';
+        return;
+      }
+
+      evalClasses.forEach(cls => {
+        select.innerHTML += `<option value="${cls}">${cls}</option>`;
+      });
+
+      if (!currentEvalSample) {
+        shuffleEvaluationSample();
+      }
+    }
+
+    async function shuffleEvaluationSample() {
+      const cls = document.getElementById('classSelect').value;
+      if (!cls) return;
+
+      const res = await fetch(`/admin/evaluation/sample?class=${encodeURIComponent(cls)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      currentEvalSample = data;
+      document.getElementById('evalImage').src = data.image_url || '';
+      document.getElementById('evalGroundTruth').textContent = data.actual_class || '-';
+      document.getElementById('evalPrediction').textContent = 'Run analysis';
+      document.getElementById('evalPrediction').className = 'result-muted';
+      document.getElementById('evalConfidence').textContent = '-';
+      document.getElementById('evalResult').textContent = 'Pending';
+      document.getElementById('evalResult').className = 'result-muted';
+    }
+
+    async function runSelectedEvaluation() {
+      if (!currentEvalSample?.image_path) return;
+
+      const res = await fetch('/admin/evaluation/run-one', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_path: currentEvalSample.image_path,
+          actual_class: currentEvalSample.actual_class
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      document.getElementById('evalPrediction').textContent = data.predicted_class || '-';
+      document.getElementById('evalConfidence').textContent = data.confidence || '-';
+
+      const correct = !!data.correct;
+      document.getElementById('evalPrediction').className = correct ? 'result-success' : 'result-danger';
+      document.getElementById('evalResult').textContent = correct ? 'Correct ✅' : 'Incorrect ❌';
+      document.getElementById('evalResult').className = correct ? 'result-success' : 'result-danger';
+
+      loadEvaluationSummary();
+    }
+
+    async function loadEvaluationSummary() {
+      const res = await fetch('/admin/evaluation/summary');
+      const data = await res.json();
+
+      document.getElementById('evalTotalSamples').textContent = data.total_samples ?? 0;
+      document.getElementById('evalCorrectPredictions').textContent = data.correct_predictions ?? 0;
+      document.getElementById('evalGlobalAccuracy').textContent = `${data.global_accuracy ?? 0}%`;
+
+      const statsBody = document.getElementById('evalStatsBody');
+      statsBody.innerHTML = '';
+
+      if (!(data.per_class_stats || []).length) {
+        statsBody.innerHTML = `
+          <tr>
+            <td colspan="7">No evaluation results yet. Choose a class, shuffle a sample, then run AI analysis.</td>
+          </tr>
+        `;
+      } else {
+        (data.per_class_stats || []).forEach(row => {
+          statsBody.innerHTML += `
+            <tr>
+              <td>${row.class}</td>
+              <td>${row.samples}</td>
+              <td>${row.tp}</td>
+              <td>${row.tn}</td>
+              <td>${row.fp}</td>
+              <td>${row.fn}</td>
+              <td>${row.accuracy}</td>
+            </tr>
+          `;
+        });
+      }
+
+      const histBody = document.getElementById('evalHistoryBody');
+      histBody.innerHTML = '';
+
+      if (!(data.history || []).length) {
+        histBody.innerHTML = `
+          <tr>
+            <td colspan="5">No audit log yet.</td>
+          </tr>
+        `;
+      } else {
+        (data.history || []).slice().reverse().forEach(row => {
+          histBody.innerHTML += `
+            <tr>
+              <td>${row.PrettyActual || row.Actual}</td>
+              <td>${row.PrettyPredicted || row.Predicted}</td>
+              <td>${row.Confidence}</td>
+              <td>${row.Correct ? '✅' : '❌'}</td>
+              <td>${row.Timestamp || '-'}</td>
+            </tr>
+          `;
+        });
+      }
+    }
+
+    async function clearEvaluationHistory() {
+      await fetch('/admin/evaluation/clear', { method: 'POST' });
+      loadEvaluationSummary();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadLiveCases();
+      loadEvaluationSummary();
+      setInterval(loadLiveCases, 5000);
+    });
+  </script>
+</body>
+</html>

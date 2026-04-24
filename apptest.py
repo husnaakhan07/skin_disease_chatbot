@@ -1,5 +1,5 @@
 from groq import Groq
-from flask import Flask, render_template, jsonify, request, url_for, send_from_directory
+from flask import Flask, render_template, jsonify, request, url_for, send_from_directory, abort
 from src.helper import download_hugging_face_embeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_groq import ChatGroq
@@ -31,25 +31,26 @@ import torch.nn as nn
 app = Flask(__name__)
 load_dotenv()
 
-# -----------------------------------------------------------------------------
+
 # CONFIGURATION
-# -----------------------------------------------------------------------------
+
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# IMPORTANT:
-# If True, unlabeled uploads will use predicted class as Actual.
-# This makes the dashboard update for UI testing, but accuracy becomes artificial.
-# Set False later for real clinical evaluation after user.html sends actual_class.
-USE_PREDICTION_AS_ACTUAL_WHEN_MISSING = True
+# Live user uploads are NOT used for real accuracy.
+# Keep this False so unknown live uploads remain Actual="unknown".
+USE_PREDICTION_AS_ACTUAL_WHEN_MISSING = False
 
 UPLOAD_DIR = "static/uploads"
 AUDIO_DIR = "static/audio"
 ADMIN_UPLOAD_DIR = "static/admin_uploads"
 DATA_DIR = "data"
-LOG_FILE = os.path.join(DATA_DIR, "admin_logs.json")
+TEST_DATA_DIR = os.path.join(DATA_DIR, "test_data")
 
-for folder in [UPLOAD_DIR, AUDIO_DIR, ADMIN_UPLOAD_DIR, DATA_DIR]:
+LIVE_LOG_FILE = os.path.join(DATA_DIR, "admin_logs.json")
+EVAL_LOG_FILE = os.path.join(DATA_DIR, "evaluation_logs.json")
+
+for folder in [UPLOAD_DIR, AUDIO_DIR, ADMIN_UPLOAD_DIR, DATA_DIR, TEST_DATA_DIR]:
     os.makedirs(folder, exist_ok=True)
 
 
@@ -66,31 +67,31 @@ tts_status = True
 tts_modifier = "[quick]"
 
 
-# ADMIN DATA STORAGE
+# JSON STORAGE HELPERS
 
-def load_prediction_logs():
-    """Load saved admin prediction history from disk."""
-    if os.path.exists(LOG_FILE):
+def load_json_list(path):
+    if os.path.exists(path):
         try:
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data if isinstance(data, list) else []
         except Exception as e:
-            print(f"Error loading admin logs: {e}")
+            print(f"Error loading {path}: {e}")
     return []
 
 
-def save_prediction_logs(data):
-    """Save admin prediction history to disk."""
+def save_json_list(path, data):
     try:
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
     except Exception as e:
-        print(f"Error saving admin logs: {e}")
+        print(f"Error saving {path}: {e}")
 
 
-prediction_history = load_prediction_logs()
+prediction_history = load_json_list(LIVE_LOG_FILE)
+evaluation_history = load_json_list(EVAL_LOG_FILE)
+
 
 
 # SKIN DISEASE MODEL SETUP
@@ -206,18 +207,8 @@ DISEASE_KEYWORDS = {
 }
 
 FOLLOW_UP_INDICATORS = [
-    "it",
-    "this",
-    "that",
-    "the condition",
-    "the disease",
-    "its",
-    "for it",
-    "tell me more",
-    "what about",
-    "symptoms of it",
-    "treatment for it",
-    "causes of it",
+    "it", "this", "that", "the condition", "the disease", "its", "for it",
+    "tell me more", "what about", "symptoms of it", "treatment for it", "causes of it",
 ]
 
 try:
@@ -248,6 +239,7 @@ skin_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
+
 
 # RAG SETUP
 
@@ -307,6 +299,7 @@ conversational_rag_chain = RunnableWithMessageHistory(
     output_messages_key="answer",
 )
 
+
 # MEDICAL ADVICE
 
 def get_medical_advice(disease, question, session_id="static_user"):
@@ -327,8 +320,7 @@ def get_medical_advice(disease, question, session_id="static_user"):
         if "symptom" in question_lower:
             medical_query = (
                 f"Based on the medical book, give only the symptoms of {pretty_disease} ({disease}). "
-                f"Answer clearly with bullet points. "
-                f"Do not include apologies or mention missing material. {question}"
+                f"Answer clearly with bullet points. Do not include apologies or mention missing material. {question}"
             )
         elif any(x in question_lower for x in ["medication", "medicine", "drug", "dosage", "dose"]):
             medical_query = (
@@ -341,24 +333,18 @@ def get_medical_advice(disease, question, session_id="static_user"):
         elif any(x in question_lower for x in ["treatment", "therapy", "cure"]):
             medical_query = (
                 f"Based on the medical book, give only the treatments for {pretty_disease} ({disease}). "
-                f"Answer clearly with bullet points. "
-                f"Do not include apologies or mention missing material. {question}"
+                f"Answer clearly with bullet points. Do not include apologies or mention missing material. {question}"
             )
         elif any(x in question_lower for x in ["cause", "causes", "trigger", "triggers", "why"]):
             medical_query = (
                 f"Based on the medical book, give only the causes or triggers of {pretty_disease} ({disease}). "
-                f"Answer clearly with bullet points. "
-                f"Do not include apologies or mention missing material. {question}"
+                f"Answer clearly with bullet points. Do not include apologies or mention missing material. {question}"
             )
         else:
             medical_query = (
                 f"Based on the medical book, provide information only about {pretty_disease} ({disease}). "
-                f"Answer directly and clearly. "
-                f"Do not include apologies or mention missing material. {question}"
+                f"Answer directly and clearly. Do not include apologies or mention missing material. {question}"
             )
-
-        print(f"[get_medical_advice] disease={disease}")
-        print(f"[get_medical_advice] medical_query={medical_query}")
 
         response = medical_rag_chain.invoke({"input": medical_query})
         answer = (response.get("answer") or "").strip()
@@ -376,17 +362,11 @@ def get_medical_advice(disease, question, session_id="static_user"):
 
         for phrase in phrases_to_remove:
             answer = answer.replace(phrase, "")
-
         answer = re.sub(r"^\s*(however[, ]*)?", "", answer, flags=re.IGNORECASE).strip()
 
         not_found_phrases = [
-            "don't have information",
-            "does not contain",
-            "not in the provided",
-            "cannot find",
-            "no information about",
-            "not mentioned",
-            "no information",
+            "don't have information", "does not contain", "not in the provided",
+            "cannot find", "no information about", "not mentioned", "no information",
         ]
 
         if answer and not any(phrase in answer.lower() for phrase in not_found_phrases) and not needs_medication_fallback:
@@ -396,10 +376,8 @@ def get_medical_advice(disease, question, session_id="static_user"):
             general_query = (
                 f"Give the commonly used medications for {pretty_disease} ({disease}). "
                 f"For each one, include medication name, purpose, dosage, frequency, duration, and important notes. "
-                f"If a commonly used dosage is known, include it. "
                 f"If a precise dosage is uncertain or varies by patient factors, say so clearly. "
-                f"Format as a markdown table with columns: Medication, Purpose, Dosage, Frequency, Duration, Notes. "
-                f"Do not include apologies or mention missing source material."
+                f"Format as a markdown table with columns: Medication, Purpose, Dosage, Frequency, Duration, Notes."
             )
         elif "symptom" in question_lower:
             general_query = f"What are the symptoms of {pretty_disease} ({disease})? Answer with clear bullet points."
@@ -436,6 +414,7 @@ def get_medical_advice(disease, question, session_id="static_user"):
         import traceback
         traceback.print_exc()
         return f"I could not generate a detailed answer for {get_pretty_disease_name(disease)} right now. Please try asking again."
+
 
 # HELPER FUNCTIONS
 
@@ -506,8 +485,6 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
             audio_filename = f"response_{timestamp}_{random_suffix}.wav"
             audio_path = os.path.join(AUDIO_DIR, audio_filename)
 
-            print(f"Generating TTS (attempt {attempt + 1}, length: {len(tts_text)} chars)")
-
             audio_response = groq_client.audio.speech.create(
                 model="canopylabs/orpheus-v1-english",
                 voice="troy",
@@ -519,7 +496,6 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
             last_tts_time = time.time()
 
             if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-                print(f"TTS successful: {audio_filename}")
                 return audio_filename
 
         except Exception as e:
@@ -563,25 +539,117 @@ def save_admin_case_image(temp_file_path, original_filename):
     return url_for("static", filename=f"admin_uploads/{admin_image_filename}")
 
 
-def add_prediction_log(actual_class, predicted_class, confidence, report, image_path=None):
-    """Append one prediction result for admin dashboard and persist it."""
+def add_prediction_log(actual_class, predicted_class, confidence, report, image_path=None, source="User Chatbot"):
+    """Append one live prediction result for admin dashboard and persist it."""
     if not actual_class:
-        if USE_PREDICTION_AS_ACTUAL_WHEN_MISSING:
-            actual_class = predicted_class
-        else:
-            actual_class = "unknown"
+        actual_class = "unknown"
 
     row = {
         "Actual": actual_class,
         "Predicted": predicted_class,
+        "PrettyPredicted": get_pretty_disease_name(predicted_class),
         "Confidence": f"{confidence:.1f}%" if isinstance(confidence, (int, float)) else str(confidence),
         "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Report": report or "",
         "ImagePath": image_path or "",
+        "Source": source,
     }
     prediction_history.append(row)
-    save_prediction_logs(prediction_history)
-    print("✅ Admin prediction log saved:", row)
+    save_json_list(LIVE_LOG_FILE, prediction_history)
+    print("✅ Live prediction log saved:", row)
+
+
+def predict_skin_image(image_path):
+    """Run the trained skin model on one image and return prediction, pretty label, confidence, top 3."""
+    if skin_model is None:
+        return None, None, None, []
+
+    image = Image.open(image_path).convert("RGB")
+    image_tensor = skin_transform(image).unsqueeze(0).to(DEVICE)
+
+    with torch.no_grad():
+        outputs = skin_model(image_tensor)
+        probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
+        top3_prob, top3_idx = torch.topk(probabilities, 3)
+        confidence, predicted = torch.max(probabilities, 0)
+
+    predicted_class = skin_class_names[predicted.item()]
+    pretty_prediction = get_pretty_disease_name(predicted_class)
+    confidence_percent = confidence.item() * 100
+
+    top3 = []
+    for prob, idx in zip(top3_prob, top3_idx):
+        raw = skin_class_names[idx.item()]
+        top3.append({
+            "raw_class": raw,
+            "class": get_pretty_disease_name(raw),
+            "confidence": f"{prob.item() * 100:.1f}%",
+        })
+
+    return predicted_class, pretty_prediction, confidence_percent, top3
+
+
+def safe_eval_relative_path(image_path):
+    """Make sure a requested evaluation image path stays inside TEST_DATA_DIR."""
+    abs_base = os.path.abspath(TEST_DATA_DIR)
+    abs_path = os.path.abspath(os.path.join(TEST_DATA_DIR, image_path))
+    if not abs_path.startswith(abs_base):
+        return None
+    return abs_path
+
+
+def build_evaluation_summary():
+    total_samples = len(evaluation_history)
+
+    if total_samples == 0:
+        return {
+            "total_samples": 0,
+            "correct_predictions": 0,
+            "global_accuracy": 0,
+            "per_class_stats": [],
+            "history": [],
+        }
+
+    df = pd.DataFrame(evaluation_history)
+
+    for col in ["Actual", "Predicted", "Confidence", "Correct"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    correct_predictions = int(len(df[df["Actual"] == df["Predicted"]]))
+    global_accuracy = (correct_predictions / total_samples) * 100 if total_samples > 0 else 0
+
+    per_class_stats = []
+
+    for class_name in sorted(df["Actual"].unique()):
+        total = int(len(df[df["Actual"] == class_name]))
+        tp = int(len(df[(df["Actual"] == class_name) & (df["Predicted"] == class_name)]))
+        fn = int(len(df[(df["Actual"] == class_name) & (df["Predicted"] != class_name)]))
+        fp = int(len(df[(df["Actual"] != class_name) & (df["Predicted"] == class_name)]))
+        tn = int(len(df[(df["Actual"] != class_name) & (df["Predicted"] != class_name)]))
+
+        accuracy = (tp / total) * 100 if total > 0 else 0
+
+        per_class_stats.append({
+            "class": get_pretty_disease_name(class_name),
+            "raw_class": class_name,
+            "samples": total,
+            "tp": tp,
+            "tn": tn,
+            "fp": fp,
+            "fn": fn,
+            "accuracy": f"{accuracy:.1f}%",
+        })
+
+    return {
+        "total_samples": int(total_samples),
+        "correct_predictions": int(correct_predictions),
+        "global_accuracy": round(global_accuracy, 1),
+        "per_class_stats": per_class_stats,
+        "history": evaluation_history[-50:],
+    }
+
+
 
 # ROUTES
 
@@ -593,7 +661,7 @@ def user_dashboard():
 
 @app.route("/admin")
 def admin_dashboard():
-    return render_template("admin1.html")
+    return render_template("admindashboard.html")
 
 
 @app.route("/static/audio/<path:filename>")
@@ -605,15 +673,13 @@ def serve_audio(filename):
 def chat():
     msg = request.form.get("msg", "").strip()
     image_file = request.files.get("image")
-    actual_class = request.form.get("actual_class", "").strip()
     final_answer = ""
     audio_url = None
     session_id = request.form.get("session_id", "static_user").strip() or "static_user"
+    source = request.form.get("source", "User Chatbot").strip() or "User Chatbot"
 
     try:
-       
         # CASE 1: Image uploaded
- 
         if image_file and image_file.filename != "":
             safe_name = secure_filename(image_file.filename)
             temp_filename = f"img_{int(time.time() * 1000)}_{safe_name}"
@@ -624,19 +690,7 @@ def chat():
                 admin_image_url = save_admin_case_image(file_path, image_file.filename)
 
                 if skin_model is not None:
-                    image = Image.open(file_path).convert("RGB")
-                    image_tensor = skin_transform(image).unsqueeze(0).to(DEVICE)
-
-                    with torch.no_grad():
-                        outputs = skin_model(image_tensor)
-                        probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
-
-                        top3_prob, top3_idx = torch.topk(probabilities, 3)
-                        confidence, predicted = torch.max(probabilities, 0)
-
-                    primary_disease_raw = skin_class_names[predicted.item()]
-                    primary_disease = get_pretty_disease_name(primary_disease_raw)
-                    primary_confidence = confidence.item() * 100
+                    primary_disease_raw, primary_disease, primary_confidence, top3 = predict_skin_image(file_path)
 
                     set_detected_disease(session_id, primary_disease_raw)
                     set_last_mentioned_disease(session_id, primary_disease_raw)
@@ -646,11 +700,8 @@ def chat():
                     formatted_response += f"**Confidence:** {primary_confidence:.1f}%\n\n"
                     formatted_response += "**Top 3 possibilities:**\n"
 
-                    for i, (prob, idx) in enumerate(zip(top3_prob, top3_idx), 1):
-                        disease_raw = skin_class_names[idx.item()]
-                        disease = get_pretty_disease_name(disease_raw)
-                        conf = prob.item() * 100
-                        formatted_response += f"{i}. {disease} ({conf:.1f}%)\n"
+                    for i, item in enumerate(top3, 1):
+                        formatted_response += f"{i}. {item['class']} ({item['confidence']})\n"
 
                     formatted_response += "\n---\n"
                     final_answer = formatted_response
@@ -659,15 +710,13 @@ def chat():
                         advice = get_medical_advice(primary_disease_raw, msg, session_id)
                         final_answer += f"\n\n{advice}"
 
-                    # CRITICAL FIX:
-                    # Store ImagePath and Report so admin1.html can display them.
-                    # Clinical/per-class metrics only update when actual_class is not blank.
                     add_prediction_log(
-                        actual_class=actual_class,
+                        actual_class="unknown",
                         predicted_class=primary_disease_raw,
                         confidence=primary_confidence,
                         report=final_answer,
                         image_path=admin_image_url,
+                        source=source,
                     )
 
                 else:
@@ -681,13 +730,13 @@ def chat():
                     ])
                     final_answer = response.content
 
-                    # Vision fallback has no structured class/confidence, but still log for admin history.
                     add_prediction_log(
-                        actual_class=actual_class,
+                        actual_class="unknown",
                         predicted_class="vision_model_result",
                         confidence="N/A",
                         report=final_answer,
                         image_path=admin_image_url,
+                        source=source,
                     )
 
             except Exception as e:
@@ -702,14 +751,11 @@ def chat():
                 except Exception:
                     pass
 
-     
         # CASE 2: Text only
-  
         else:
             if not msg:
                 return jsonify({"answer": "Please provide a question or upload a skin image.", "audio_url": None})
 
-            print(f"📝 User asked: {msg}")
             msg_lower = msg.lower().strip()
 
             greetings = ["hello", "hi", "hey", "good morning", "good afternoon"]
@@ -727,8 +773,6 @@ def chat():
                 is_follow_up = any(indicator in msg_lower for indicator in FOLLOW_UP_INDICATORS)
 
                 if mentioned_disease_raw:
-                    pretty_disease = get_pretty_disease_name(mentioned_disease_raw)
-                    print(f"🎯 User mentioned disease: {pretty_disease}")
                     set_last_mentioned_disease(session_id, mentioned_disease_raw)
                     final_answer = get_medical_advice(mentioned_disease_raw, msg, session_id)
 
@@ -736,11 +780,8 @@ def chat():
                     last_disease = get_last_mentioned_disease(session_id) or get_detected_disease(session_id)
 
                     if last_disease:
-                        pretty_disease = get_pretty_disease_name(last_disease)
-                        print(f"🔄 Follow-up about: {pretty_disease}")
                         final_answer = get_medical_advice(last_disease, msg, session_id)
                     else:
-                        print("📚 No context, using RAG")
                         response = conversational_rag_chain.invoke(
                             {"input": msg},
                             config={"configurable": {"session_id": session_id}},
@@ -748,14 +789,11 @@ def chat():
                         final_answer = response["answer"]
 
                 else:
-                    print("📚 General query, using RAG")
                     response = conversational_rag_chain.invoke(
                         {"input": msg},
                         config={"configurable": {"session_id": session_id}},
                     )
                     final_answer = response["answer"]
-
-            print(f"✅ Answer generated (length: {len(final_answer)})")
 
         final_answer = clean_response_for_display(final_answer)
 
@@ -782,87 +820,13 @@ def chat():
         })
 
 
+# LIVE CASES
 @app.route("/admin/data", methods=["GET"])
 def admin_data():
-    global prediction_history
-
-    total_uploads = len(prediction_history)
     audio_count = len([f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")])
-
-    if total_uploads == 0:
-        return jsonify({
-            "total_samples": 0,
-            "labeled_samples": 0,
-            "unlabeled_samples": 0,
-            "correct_predictions": 0,
-            "global_accuracy": 0,
-            "audio_count": audio_count,
-            "per_class_stats": [],
-            "history": [],
-        })
-
-    df = pd.DataFrame(prediction_history)
-
-    # Normalize required columns in case old saved rows are missing fields.
-    for col in ["Actual", "Predicted", "Confidence", "Timestamp", "Report", "ImagePath"]:
-        if col not in df.columns:
-            df[col] = ""
-
-    # Real evaluation uses only rows where the true label is known.
-    known_df = df[(df["Actual"].notna()) & (df["Actual"] != "") & (df["Actual"] != "unknown")]
-    known_samples = len(known_df)
-    unlabeled_samples = total_uploads - known_samples
-
-    if known_samples > 0:
-        correct_preds = len(known_df[known_df["Actual"] == known_df["Predicted"]])
-        global_accuracy = (correct_preds / known_samples) * 100
-    else:
-        correct_preds = 0
-        global_accuracy = 0
-
-    per_class_stats = []
-    tested_classes = sorted(known_df["Actual"].unique()) if known_samples > 0 else []
-
-    for class_name in tested_classes:
-        class_df = known_df[known_df["Actual"] == class_name]
-        total = len(class_df)
-        tp = len(class_df[class_df["Predicted"] == class_name])
-        fn = total - tp
-        fp = len(known_df[(known_df["Actual"] != class_name) & (known_df["Predicted"] == class_name)])
-        tn = len(known_df[(known_df["Actual"] != class_name) & (known_df["Predicted"] != class_name)])
-
-        accuracy = (tp / total) * 100 if total > 0 else 0
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
-        per_class_stats.append({
-            "class": get_pretty_disease_name(class_name),
-            "raw_class": class_name,
-            "samples": total,
-            "tp": int(tp),
-            "fn": int(fn),
-            "fp": int(fp),
-            "tn": int(tn),
-            "accuracy": f"{accuracy:.1f}%",
-            "precision": f"{precision:.2f}",
-            "recall": f"{recall:.2f}",
-            "f1_score": f"{f1:.2f}",
-        })
-
     return jsonify({
-        #  totalSamples will show all uploaded cases.
-        "total_samples": total_uploads,
-
-        # Extra fields for debugging or future HTML cards.
-        "labeled_samples": known_samples,
-        "unlabeled_samples": unlabeled_samples,
-
-        # Evaluation metrics based only on labeled cases.
-        "correct_predictions": int(correct_preds),
-        "global_accuracy": round(global_accuracy, 1),
+        "total_samples": len(prediction_history),
         "audio_count": audio_count,
-        "per_class_stats": per_class_stats,
         "history": prediction_history[-50:],
     })
 
@@ -871,9 +835,8 @@ def admin_data():
 def admin_clear():
     global prediction_history
     prediction_history = []
-    save_prediction_logs(prediction_history)
+    save_json_list(LIVE_LOG_FILE, prediction_history)
 
-    # Clear saved admin images.
     if os.path.exists(ADMIN_UPLOAD_DIR):
         for filename in os.listdir(ADMIN_UPLOAD_DIR):
             file_path = os.path.join(ADMIN_UPLOAD_DIR, filename)
@@ -888,6 +851,119 @@ def admin_clear():
     return jsonify({"success": True})
 
 
+#MODEL EVALUATION 
+@app.route("/admin/evaluation/classes", methods=["GET"])
+def evaluation_classes():
+    classes = []
+
+    if os.path.exists(TEST_DATA_DIR):
+        for cls in sorted(os.listdir(TEST_DATA_DIR)):
+            class_path = os.path.join(TEST_DATA_DIR, cls)
+            if os.path.isdir(class_path):
+                classes.append(cls)
+
+    return jsonify({"classes": classes})
+
+
+@app.route("/admin/evaluation/sample", methods=["GET"])
+def evaluation_sample():
+    selected_class = request.args.get("class", "").strip()
+    if not selected_class:
+        return jsonify({"error": "Missing class"}), 400
+
+    class_path = os.path.abspath(os.path.join(TEST_DATA_DIR, selected_class))
+    base_path = os.path.abspath(TEST_DATA_DIR)
+
+    if not class_path.startswith(base_path) or not os.path.isdir(class_path):
+        return jsonify({"error": "Invalid class"}), 400
+
+    valid_exts = (".jpg", ".jpeg", ".png", ".webp")
+    images = [f for f in os.listdir(class_path) if f.lower().endswith(valid_exts)]
+
+    if not images:
+        return jsonify({"error": "No images found for this class"}), 404
+
+    chosen = random.choice(images)
+    relative_path = os.path.join(selected_class, chosen).replace("\\", "/")
+
+    return jsonify({
+        "actual_class": selected_class,
+        "image_path": relative_path,
+        "image_url": url_for("evaluation_image", image_path=relative_path),
+    })
+
+
+@app.route("/admin/evaluation/image/<path:image_path>", methods=["GET"])
+def evaluation_image(image_path):
+    abs_path = safe_eval_relative_path(image_path)
+    if abs_path is None or not os.path.exists(abs_path):
+        abort(404)
+
+    directory = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return send_from_directory(directory, filename)
+
+
+@app.route("/admin/evaluation/run-one", methods=["POST"])
+def evaluation_run_one():
+    global evaluation_history
+
+    data = request.get_json(silent=True) or {}
+    image_path = data.get("image_path", "").strip()
+    actual_class = data.get("actual_class", "").strip()
+
+    if not image_path or not actual_class:
+        return jsonify({"error": "Missing image_path or actual_class"}), 400
+
+    abs_path = safe_eval_relative_path(image_path)
+    if abs_path is None or not os.path.exists(abs_path):
+        return jsonify({"error": "Invalid image path"}), 400
+
+    if skin_model is None:
+        return jsonify({"error": "Skin model is not loaded"}), 500
+
+    predicted_class, pretty_prediction, confidence_percent, top3 = predict_skin_image(abs_path)
+    correct = actual_class == predicted_class
+
+    row = {
+        "Actual": actual_class,
+        "PrettyActual": get_pretty_disease_name(actual_class),
+        "Predicted": predicted_class,
+        "PrettyPredicted": pretty_prediction,
+        "Confidence": f"{confidence_percent:.1f}%",
+        "Correct": bool(correct),
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ImagePath": url_for("evaluation_image", image_path=image_path),
+    }
+
+    evaluation_history.append(row)
+    save_json_list(EVAL_LOG_FILE, evaluation_history)
+
+    return jsonify({
+        "actual_class": actual_class,
+        "actual_pretty": get_pretty_disease_name(actual_class),
+        "predicted_class": pretty_prediction,
+        "raw_predicted_class": predicted_class,
+        "confidence": f"{confidence_percent:.1f}%",
+        "correct": bool(correct),
+        "top3": top3,
+    })
+
+
+@app.route("/admin/evaluation/summary", methods=["GET"])
+def evaluation_summary():
+    return jsonify(build_evaluation_summary())
+
+
+@app.route("/admin/evaluation/clear", methods=["POST"])
+def evaluation_clear():
+    global evaluation_history
+    evaluation_history = []
+    save_json_list(EVAL_LOG_FILE, evaluation_history)
+    return jsonify({"success": True})
+
+
+#  MISC
 @app.route("/clear_history", methods=["POST"])
 def clear_history():
     try:
@@ -910,7 +986,8 @@ def status():
         "skin_model_loaded": skin_model is not None,
         "skin_classes": len(skin_class_names) if skin_class_names else 0,
         "tts_enabled": tts_status,
-        "admin_history_count": len(prediction_history),
+        "live_history_count": len(prediction_history),
+        "evaluation_history_count": len(evaluation_history),
     })
 
 
@@ -920,7 +997,6 @@ def mute():
         global tts_status
         data = request.get_json(silent=True) or {}
         tts_status = not data.get("isActive", False)
-        print(f"TTS Status: {tts_status}")
         return jsonify({"success": True, "tts_enabled": tts_status})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -929,14 +1005,15 @@ def mute():
 if __name__ == "__main__":
     cleanup_old_audio_files()
     print("=" * 60)
-    print("🚀 MEDICAL AI ASSISTANT - TEST VERSION")
+    print("MEDICAL AI ASSISTANT")
     print("=" * 60)
     print("👤 User Dashboard: http://localhost:8080/")
     print("📊 Admin Dashboard: http://localhost:8080/admin")
-    print(f"🧠 Skin model loaded: {skin_model is not None}")
+    print(f"Skin model loaded: {skin_model is not None}")
     if skin_class_names:
         print(f"🩺 Can detect: {len(skin_class_names)} conditions")
-    print(f"🔊 TTS Enabled: {tts_status}")
-    print(f"📜 Admin history rows loaded: {len(prediction_history)}")
+    print(f"TTS Enabled: {tts_status}")
+    print(f"Live case rows loaded: {len(prediction_history)}")
+    print(f"Evaluation rows loaded: {len(evaluation_history)}")
     print("=" * 60)
     app.run(host="0.0.0.0", port=8080, debug=True)
