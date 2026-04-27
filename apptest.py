@@ -211,6 +211,13 @@ FOLLOW_UP_INDICATORS = [
     "tell me more", "what about", "symptoms of it", "treatment for it", "causes of it",
 ]
 
+TOP_RESULT_KEYWORDS = [
+    "acne", "actinickeratosis", "basalcellcarcinoma", "benigntumors", "bullous", "chickenpox", "cowpox",
+    "eczema", "healthy", "hfmd", "infestationsbites", "lichen", "lupus", "measles", "melanocyticnevi", "moles",
+    "monkeypox", "psoriasis", "rosacea", "seborrhkeratoses", "skincancer", "sunsunlightdamage", "tinea", "unknown",
+    "vascularlesion", "vasculartumors", "vasculitis", "vitiligo", "warts"
+]
+
 try:
     checkpoint = torch.load("skin_disease_model.pth", map_location=DEVICE)
     skin_class_names = checkpoint["class_names"]
@@ -448,6 +455,10 @@ def clean_response_for_display(text):
 
 
 def truncate_for_tts(text, max_chars=MAX_TTS_CHARS):
+    # Remove images encapsulated by <div> tag from text
+    pattern = r"<div[^>]*>([\s\S]*?)<\/div>"
+    text = re.sub(pattern, "", text)
+    
     if not text or len(text) <= max_chars:
         return text
     truncated = text[:max_chars]
@@ -700,8 +711,19 @@ def chat():
                     formatted_response += f"**Confidence:** {primary_confidence:.1f}%\n\n"
                     formatted_response += "**Top 3 possibilities:**\n"
 
+                    top_results_path = "./static/top_results/"
+
                     for i, item in enumerate(top3, 1):
                         formatted_response += f"{i}. {item['class']} ({item['confidence']})\n"
+                        # Attach example image of disease
+                        disease_raw = item['raw_class']
+                        if disease_raw in TOP_RESULT_KEYWORDS:
+                            print("DISEASE FOUND: " + str(item['raw_class']))
+                            top_image_filename = "".join(os.listdir(top_results_path + str(disease_raw).lower()))
+                            top_image_path = top_results_path + str(disease_raw).lower() + "/" + top_image_filename
+                            formatted_response += f"<div><img src='{top_image_path}' class=\"top-result\"></div>"
+                        else:
+                            print("DISEASE NOT FOUND: " + str(item['raw_class']))
 
                     formatted_response += "\n---\n"
                     final_answer = formatted_response
