@@ -36,3 +36,7 @@ data/evaluation_logs.json
 medibot/
 .env
 __pycache__/
+# Private runtime media and local secrets
+instance/
+.env.*
+!.env.example
