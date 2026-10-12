@@ -21,6 +21,16 @@ Derm Skin Care explores two complementary workflows: skin-image classification a
 
 This is an end-to-end **research prototype**, not a clinically validated diagnostic service.
 
+## My contributions
+
+My personal contributions to this collaborative project were:
+
+- **RAG implementation:** Built the document-retrieval workflow that supplies relevant reference material to the chatbot’s language model.
+- **Chatbot development:** Built the conversational application and integrated the retrieval workflow into the user-facing chat experience.
+- **Temporary conversational memory:** Implemented session-scoped conversation history so the chatbot can retain context for follow-up questions during a session, with support for clearing that history.
+
+These contributions are separate from the image-classifier training and dataset work. The application remains a research prototype; successful responses do not establish clinical accuracy or safety.
+
 ## Engineering highlights
 
 | Component | Implementation |
