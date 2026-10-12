@@ -162,6 +162,40 @@ flask --app app run --host 127.0.0.1 --port 8080 --no-debug
 
 Open **http://127.0.0.1:8080**. This command avoids the debug-server settings in the current `python app.py` entry point. Provider access, Pinecone setup and model availability are prerequisites. These instructions are not a verified deployment recipe.
 
+## Example interactions
+
+The following screenshots were captured during a local manual walkthrough. They show application behavior—not a formal evaluation, clinically verified diagnosis, or validated treatment recommendation. Original screenshots are reproduced without visual alterations.
+
+### Image input and ranked predictions
+
+![Chatbot greeting, image upload and ranked model predictions](docs/assets/chat-example-01.png)
+
+The interface accepts an image and displays ranked predictions alongside a conversational response. The displayed 62.2% is the model score for this example, not overall test accuracy or a calibrated probability of a correct diagnosis. No ground-truth diagnosis was independently verified.
+
+### Explanation within the conversation
+
+![Expanded explanation displayed in the same chatbot conversation](docs/assets/chat-example-02.png)
+
+A second view of the same interaction shows the explanatory response and formatted text. This is not a separate evaluation sample; source grounding and clinical correctness were not established by this walkthrough.
+
+### Contextual follow-up and structured output
+
+![Contextual follow-up question and generated medication table](docs/assets/chat-example-03.png)
+
+The follow-up references the earlier conversation, illustrating context retention and structured table rendering. It does not establish cross-user session isolation or medical correctness.
+
+> **Unverified medical output:** The third screenshot includes generated medication and dosing information. It documents prototype behavior and a safety-evaluation need; it is not prescribing guidance and must not be used for treatment decisions.
+
+### Scope of this walkthrough
+
+| Demonstrated interface behavior | Not established by these screenshots |
+|:--|:--|
+| Greeting response and image-result rendering | Diagnostic accuracy or calibrated confidence |
+| Explanatory text and a contextual follow-up | Reliable retrieval grounding or medical safety |
+| Structured table rendering | Clinical validation or generalization |
+
+These are documentation assets, not training or test-dataset additions. The visible DermNet watermark is retained; reproduction rights have not been verified, and the project’s code license does not establish rights to third-party images.
+
 ## Evaluation and limitations
 
 No accuracy figure is reported here without a reproducible evaluation artifact. Existing evaluation scripts:
