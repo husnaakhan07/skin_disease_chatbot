@@ -581,6 +581,7 @@
             }
         }
     </style>
+<script src="/static/vendor/purify.min.js"></script>
 </head>
 <body>
     <div class="chat-card">
@@ -654,7 +655,7 @@
         fetch('/clear_history', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: 'static_user' })
+            body: JSON.stringify({})
         }).then(() => {
             setStatus('', 'success');
         }).catch(e => {
@@ -699,7 +700,7 @@
                     transcript += event.results[i][0].transcript;
                 }
                 textInput.value = transcript.trim();
-                console.log('STT transcript:', transcript);
+                // Do not log speech transcripts.
                 setStatus('Voice captured. Review or send.', 'success');
             };
 
@@ -800,7 +801,7 @@
             const parsedHtml = marked.parse(response || "No response received");
 
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = parsedHtml;
+            tempDiv.innerHTML = DOMPurify.sanitize(parsedHtml, {USE_PROFILES: {html: true}});
             wrapTables(tempDiv);
 
             const botHtml = `
@@ -899,7 +900,7 @@
             })
             .then(data => {
                 removeTypingIndicator();
-                console.log('Backend response:', data);
+                // Do not log medical responses.
 
                 if (data.answer) {
                     displayBotMessage(data.answer);
