@@ -172,7 +172,9 @@ streamlit run eval_dashboard.py
 | Dashboard | Interactive sample history is exploratory, not a full-test-set or clinical benchmark. |
 | Security | Session isolation, admin authentication, validated/private media, Markdown sanitization, trusted hosts and basic request throttling are implemented. Full application/provider testing and deployment hardening remain outstanding. |
 
-> **Research use only.** Not a medical device or substitute for professional diagnosis or treatment. Do not upload sensitive or identifiable patient data to an unreviewed deployment. Images or text may be sent to external AI providers depending on the processing path.
+> **Research prototype—not for medical practice.** This chatbot has not been clinically validated and must not be used for diagnosis, prescribing or treatment decisions. Reliable medical use would require substantially more representative, expertly labeled data, rigorous external testing across conditions and skin tones, and clinical oversight. A larger dataset alone does not guarantee safety or accuracy. Screenshots show example application behavior, not verified diagnoses or treatment recommendations.
+>
+> **Data privacy:** Do not upload sensitive or identifiable patient data to an unreviewed deployment. Images or text may be sent to external AI providers depending on the processing path.
 
 ## Security checks and deployment limits
 
