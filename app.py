@@ -1,5 +1,7 @@
 from groq import Groq
-from flask import Flask, render_template, jsonify, request, url_for, send_from_directory
+from flask import Flask, render_template, jsonify, request, url_for, send_from_directory, session, abort
+from werkzeug.exceptions import HTTPException
+from security import configure_security, current_session_id, admin_required, save_validated_upload, is_admin_authenticated
 from src.helper import download_hugging_face_embeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_groq import ChatGroq
@@ -26,6 +28,12 @@ from src.prompt import system_prompt
 
 app = Flask(__name__)
 load_dotenv()
+configure_security(app)
+UPLOAD_DIR = os.path.join(app.instance_path, "uploads")
+AUDIO_DIR = os.path.join(app.instance_path, "audio")
+audio_owners = {}
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
 # --- ADMIN DATA STORAGE ---
 prediction_history = []
@@ -41,8 +49,6 @@ MIN_TTS_INTERVAL = 0.3
 MAX_TTS_CHARS = 800
 MAX_TTS_RETRIES = 3
 
-for folder in ["static/audio", "static/uploads"]:
-    os.makedirs(folder, exist_ok=True)
 
 tts_status = True
 tts_modifier = "[quick]"
@@ -55,13 +61,13 @@ skin_class_names = []
 last_mentioned_disease = {}
 detected_disease_history = {}
 
-def get_last_mentioned_disease(session_id="static_user"):
+def get_last_mentioned_disease(session_id=None):
     return last_mentioned_disease.get(session_id)
 
 def set_last_mentioned_disease(session_id, disease):
     last_mentioned_disease[session_id] = disease
 
-def get_detected_disease(session_id="static_user"):
+def get_detected_disease(session_id=None):
     if session_id in detected_disease_history and detected_disease_history[session_id]:
         return detected_disease_history[session_id][-1]
     return None
@@ -164,13 +170,13 @@ FOLLOW_UP_INDICATORS = [
 ]
 
 try:
-    checkpoint = torch.load("skin_disease_model.pth", map_location=DEVICE)
+    checkpoint = torch.load("skin_disease_model.pth", map_location=DEVICE, weights_only=True)
     skin_class_names = checkpoint["class_names"]
     num_classes = len(skin_class_names)
 
-    print("✅ Skin disease model loaded successfully")
-    print(f"📊 Number of classes: {num_classes}")
-    print(f"📚 Classes: {skin_class_names[:10]}...")
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
     skin_model = models.resnet18(weights=None)
     num_features = skin_model.fc.in_features
@@ -179,11 +185,11 @@ try:
     skin_model = skin_model.to(DEVICE)
     skin_model.eval()
 
-    print(f"✅ Model ready on {DEVICE}")
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
 except Exception as e:
-    print(f"⚠️ Could not load skin disease model: {e}")
-    print("   Vision model fallback will be used if needed.")
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
 skin_transform = transforms.Compose([
     transforms.Resize(256),
@@ -250,7 +256,7 @@ conversational_rag_chain = RunnableWithMessageHistory(
 )
 
 # --- 4. FUNCTION TO GET MEDICAL ADVICE ---
-def get_medical_advice(disease, question, session_id="static_user"):
+def get_medical_advice(disease, question, session_id=None):
     """Get disease-specific advice without contaminating from prior chat history."""
     try:
         pretty_disease = get_pretty_disease_name(disease)
@@ -302,11 +308,11 @@ def get_medical_advice(disease, question, session_id="static_user"):
                 f"Do not include apologies or mention missing material. {question}"
             )
 
-        print(f"[get_medical_advice] disease={disease}")
-        print(f"[get_medical_advice] medical_query={medical_query}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         response = medical_rag_chain.invoke({"input": medical_query})
-        print(f"[get_medical_advice] raw RAG response={response}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         answer = (response.get("answer") or "").strip()
         needs_medication_fallback = False
@@ -328,7 +334,7 @@ def get_medical_advice(disease, question, session_id="static_user"):
             answer = answer.replace(phrase, "")
 
         answer = re.sub(r'^\s*(however[, ]*)?', '', answer, flags=re.IGNORECASE).strip()
-        print(f"[get_medical_advice] cleaned answer={answer}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         not_found_phrases = [
             "don't have information",
@@ -377,10 +383,10 @@ def get_medical_advice(disease, question, session_id="static_user"):
                 f"Do not include apologies or mention missing source material."
             )
 
-        print(f"[get_medical_advice] fallback query={general_query}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         general_response = fallbackModel.invoke(general_query)
-        print(f"[get_medical_advice] raw fallback response={general_response}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         fallback_answer = ""
         if hasattr(general_response, "content"):
@@ -396,7 +402,7 @@ def get_medical_advice(disease, question, session_id="static_user"):
             fallback_answer = fallback_answer.replace(phrase, "")
 
         fallback_answer = re.sub(r'^\s*(however[, ]*)?', '', fallback_answer, flags=re.IGNORECASE).strip()
-        print(f"[get_medical_advice] cleaned fallback_answer={fallback_answer}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         if fallback_answer:
             return fallback_answer
@@ -435,9 +441,9 @@ def get_medical_advice(disease, question, session_id="static_user"):
         )
 
     except Exception as e:
-        print(f"[get_medical_advice] ERROR: {type(e).__name__}: {e}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
         import traceback
-        traceback.print_exc()
+        pass  # Do not log request contents or provider credentials.
         return (
             f"I could not generate a detailed answer for {get_pretty_disease_name(disease)} right now. "
             f"Please try asking again."
@@ -506,9 +512,9 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
             timestamp = int(time.time() * 1000)
             random_suffix = random.randint(1000, 9999)
             audio_filename = f"response_{timestamp}_{random_suffix}.wav"
-            audio_path = os.path.join("static/audio", audio_filename)
+            audio_path = os.path.join(AUDIO_DIR, audio_filename)
 
-            print(f"Generating TTS (attempt {attempt + 1}, length: {len(tts_text)} chars)")
+            pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
             audio_response = groq_client.audio.speech.create(
                 model="canopylabs/orpheus-v1-english",
@@ -521,12 +527,13 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
             last_tts_time = time.time()
 
             if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-                print(f"TTS successful: {audio_filename}")
+                pass  # Avoid logging patient text, retrieved documents, or provider errors.
+                audio_owners[audio_filename] = current_session_id()
                 return audio_filename
 
         except Exception as e:
             error_str = str(e)
-            print(f"TTS attempt {attempt + 1} failed: {error_str[:100]}")
+            pass  # Avoid logging patient text, retrieved documents, or provider errors.
             if "rate_limit_exceeded" in error_str or "413" in error_str:
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt) + random.random()
@@ -539,7 +546,7 @@ def generate_speech_safe(text, max_retries=MAX_TTS_RETRIES):
 
 def cleanup_old_audio_files(max_files=30):
     try:
-        audio_dir = "static/audio"
+        audio_dir = AUDIO_DIR
         files = [
             os.path.join(audio_dir, f)
             for f in os.listdir(audio_dir)
@@ -549,10 +556,11 @@ def cleanup_old_audio_files(max_files=30):
         for file in files[max_files:]:
             try:
                 os.remove(file)
+                audio_owners.pop(os.path.basename(file), None)
             except Exception:
                 pass
     except Exception as e:
-        print(f"Cleanup error: {e}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
 # --- 6. ROUTES ---
 @app.route("/")
@@ -561,27 +569,33 @@ def user_dashboard():
     return render_template("user.html")
 
 @app.route("/admin")
+@admin_required
 def admin_dashboard():
     return render_template("admin.html")
 
-@app.route("/static/audio/<path:filename>")
+@app.route("/audio/<filename>")
 def serve_audio(filename):
-    return send_from_directory("static/audio", filename)
+    if audio_owners.get(filename) != current_session_id():
+        abort(404)
+    return send_from_directory(AUDIO_DIR, filename, mimetype="audio/wav")
 
 @app.route("/get", methods=["POST"])
 def chat():
     msg = request.form.get("msg", "").strip()
     image_file = request.files.get("image")
-    actual_class = request.form.get("actual_class", "").strip()
+    actual_class = request.form.get("actual_class", "").strip() if is_admin_authenticated() else ""
+    if actual_class and actual_class not in skin_class_names:
+        abort(400, description="Select a class from the loaded model labels.")
+    if len(msg) > 2000:
+        abort(400, description="Question length must not exceed 2000 characters.")
     final_answer = ""
     audio_url = None
-    session_id = "static_user"
+    session_id = current_session_id()
 
     try:
         # CASE 1: Image uploaded
         if image_file and image_file.filename != "":
-            file_path = os.path.join("static/uploads", f"img_{int(time.time())}_{image_file.filename}")
-            image_file.save(file_path)
+            file_path = save_validated_upload(image_file, UPLOAD_DIR)
 
             try:
                 if skin_model is not None:
@@ -644,9 +658,9 @@ def chat():
                     final_answer = response.content
 
             except Exception as e:
-                print(f"Error analyzing image: {e}")
+                pass  # Avoid logging patient text, retrieved documents, or provider errors.
                 import traceback
-                traceback.print_exc()
+                pass  # Do not log request contents or provider credentials.
                 final_answer = "I couldn't analyze the image. Please make sure it's a clear photo of a skin condition."
 
             finally:
@@ -660,7 +674,7 @@ def chat():
             if not msg:
                 return jsonify({"answer": "Please provide a question or upload a skin image.", "audio_url": None})
 
-            print(f"📝 User asked: {msg}")
+            pass  # Avoid logging patient text, retrieved documents, or provider errors.
             msg_lower = msg.lower().strip()
 
             greetings = ["hello", "hi", "hey", "good morning", "good afternoon"]
@@ -679,7 +693,7 @@ def chat():
 
                 if mentioned_disease_raw:
                     pretty_disease = get_pretty_disease_name(mentioned_disease_raw)
-                    print(f"🎯 User mentioned disease: {pretty_disease}")
+                    pass  # Avoid logging patient text, retrieved documents, or provider errors.
                     set_last_mentioned_disease(session_id, mentioned_disease_raw)
                     advice = get_medical_advice(mentioned_disease_raw, msg, session_id)
                     final_answer = advice
@@ -689,11 +703,11 @@ def chat():
 
                     if last_disease:
                         pretty_disease = get_pretty_disease_name(last_disease)
-                        print(f"🔄 Follow-up about: {pretty_disease}")
+                        pass  # Avoid logging patient text, retrieved documents, or provider errors.
                         advice = get_medical_advice(last_disease, msg, session_id)
                         final_answer = advice
                     else:
-                        print("📚 No context, using RAG")
+                        pass  # Avoid logging patient text, retrieved documents, or provider errors.
                         response = conversational_rag_chain.invoke(
                             {"input": msg},
                             config={"configurable": {"session_id": session_id}},
@@ -701,40 +715,48 @@ def chat():
                         final_answer = response["answer"]
 
                 else:
-                    print("📚 General query, using RAG")
+                    pass  # Avoid logging patient text, retrieved documents, or provider errors.
                     response = conversational_rag_chain.invoke(
                         {"input": msg},
                         config={"configurable": {"session_id": session_id}},
                     )
                     final_answer = response["answer"]
 
-            print(f"✅ Answer generated (length: {len(final_answer)})")
+            pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         final_answer = clean_response_for_display(final_answer)
 
         try:
-            if tts_status:
+            if session.get("tts_enabled", True):
                 audio_filename = generate_speech_safe(final_answer)
                 if audio_filename:
                     audio_url = url_for("serve_audio", filename=audio_filename)
         except Exception as tts_error:
-            print(f"TTS error: {tts_error}")
+            pass  # Avoid logging patient text, retrieved documents, or provider errors.
 
         return jsonify({
             "answer": final_answer,
             "audio_url": audio_url,
         })
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error: {e}")
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
         import traceback
-        traceback.print_exc()
+        pass  # Do not log request contents or provider credentials.
         return jsonify({
             "answer": "I encountered an error. Please try again.",
             "audio_url": None,
         })
 
+@app.route("/admin/evaluate", methods=["POST"])
+@admin_required
+def admin_evaluate():
+    return chat()
+
 @app.route("/admin/data", methods=["GET"])
+@admin_required
 def admin_data():
     global prediction_history
 
@@ -745,7 +767,7 @@ def admin_data():
             "total_samples": 0,
             "correct_predictions": 0,
             "global_accuracy": 0,
-            "audio_count": len([f for f in os.listdir("static/audio") if f.endswith(".wav")]),
+            "audio_count": len([f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")]),
             "per_class_stats": [],
             "history": [],
         })
@@ -785,6 +807,7 @@ def admin_data():
             "fp": fp,
             "tn": tn,
             "accuracy": f"{accuracy:.1f}%",
+            "class_recall_percent": f"{accuracy:.1f}%",
             "precision": f"{precision:.2f}",
             "recall": f"{recall:.2f}",
             "f1_score": f"{f1:.2f}",
@@ -794,12 +817,13 @@ def admin_data():
         "total_samples": known_samples,
         "correct_predictions": correct_preds,
         "global_accuracy": round(global_accuracy, 1),
-        "audio_count": len([f for f in os.listdir("static/audio") if f.endswith(".wav")]),
+        "audio_count": len([f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")]),
         "per_class_stats": per_class_stats,
         "history": prediction_history[-50:],
     })
 
 @app.route("/admin/clear", methods=["POST"])
+@admin_required
 def admin_clear():
     global prediction_history
     prediction_history = []
@@ -808,45 +832,47 @@ def admin_clear():
 @app.route("/clear_history", methods=["POST"])
 def clear_history():
     try:
-        session_id = request.json.get("session_id", "static_user")
+        session_id = current_session_id()
         if session_id in store:
             del store[session_id]
         clear_session_data(session_id)
         return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        return jsonify({"success": False, "error": "Request could not be completed"})
 
 @app.route("/status", methods=["GET"])
+@admin_required
 def status():
-    audio_files = [f for f in os.listdir("static/audio") if f.endswith(".wav")]
+    audio_files = [f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")]
     return jsonify({
         "audio_files_count": len(audio_files),
         "last_tts_time": last_tts_time,
         "skin_model_loaded": skin_model is not None,
         "skin_classes": len(skin_class_names) if skin_class_names else 0,
+        "class_names": skin_class_names,
         "tts_enabled": tts_status,
     })
 
 @app.route("/mute", methods=["POST"])
 def mute():
     try:
-        global tts_status
-        tts_status = not request.json.get("isActive", False)
-        print(f"TTS Status: {tts_status}")
-        return jsonify({"success": True, "tts_enabled": tts_status})
+        enabled = not (request.get_json(silent=True) or {}).get("isActive", False)
+        session["tts_enabled"] = enabled
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
+        return jsonify({"success": True, "tts_enabled": enabled})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        return jsonify({"success": False, "error": "Request could not be completed"})
 
 if __name__ == "__main__":
     cleanup_old_audio_files()
-    print("=" * 60)
-    print("🚀 MEDICAL AI ASSISTANT - TEST VERSION")
-    print("=" * 60)
-    print(f"👤 User Dashboard: http://localhost:8080/")
-    print(f"📊 Admin Dashboard: http://localhost:8080/admin")
-    print(f"🧠 Skin model loaded: {skin_model is not None}")
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
     if skin_class_names:
-        print(f"🩺 Can detect: {len(skin_class_names)} conditions")
-    print(f"🔊 TTS Enabled: {tts_status}")
-    print("=" * 60)
-    app.run(host="0.0.0.0", port=8080, debug=True)
+        pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    pass  # Avoid logging patient text, retrieved documents, or provider errors.
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8080")), debug=False)
