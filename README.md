@@ -34,6 +34,14 @@ This is an end-to-end **research prototype**, not a clinically validated diagnos
 
 The project demonstrates transferable skills in Python, PyTorch, data preparation, applied NLP, model integration and evaluation instrumentation. It does not claim advertising attribution, causal experimentation, production-scale deployment or clinical validation.
 
+## Admin / model QA dashboard
+
+![Static preview of the authenticated Derm Skin Care admin evaluation dashboard](docs/assets/admin-dashboard-preview.png)
+
+> **Static empty-state preview.** Derived from the admin template; no live inference, patient images or fabricated accuracy numbers.
+
+The protected dashboard supports labeled JPEG/PNG evaluation uploads, observed accuracy, per-class precision/recall/F1, prediction history, manual refresh and a confirmed metric reset. Only authenticated administrators can supply labels; public chat requests cannot supply evaluation ground truth. Labels are evaluator-provided, not independently verified.
+
 ## Architecture
 
 ```text
@@ -117,9 +125,18 @@ Create a local `.env` file (never commit real keys):
 ```dotenv
 PINECONE_API_KEY=your_pinecone_api_key
 GROQ_API_KEY=your_groq_api_key
+FLASK_SECRET_KEY=your_random_secret_of_at_least_32_characters
+# Local HTTP only. Keep true for HTTPS deployments.
+SESSION_COOKIE_SECURE=false
+# Leave admin credentials blank to disable admin routes.
+ADMIN_USERNAME=
+ADMIN_PASSWORD=
+TRUSTED_HOSTS=localhost,127.0.0.1,[::1]
 ```
 
-Rotate any previously exposed credentials before using the project. Do not run `prepare_data.py` until its embedded credential has been removed and dataset licensing/access has been reviewed.
+The embedded Kaggle credential has been removed from the current code. **Any previously exposed token must still be revoked/rotated in Kaggle**; deleting the line does not invalidate it or clean Git history. Supply a new `KAGGLE_API_TOKEN` through your environment if needed. Review dataset licensing before downloading.
+
+Generate `FLASK_SECRET_KEY` locally with `python -c "import secrets; print(secrets.token_hex(32))"`. Never share or commit the result. The app now fails startup if this key is missing or too short. To enable `/admin`, set a non-empty `ADMIN_USERNAME` and a strong `ADMIN_PASSWORD`; the browser will request HTTP Basic authentication. Outside localhost, require HTTPS.
 
 ### 3. Prepare the index and checkpoint
 
@@ -153,9 +170,24 @@ streamlit run eval_dashboard.py
 | Confidence | Softmax scores are not calibrated probabilities of a correct medical diagnosis. |
 | Grounding | Test retrieved-source support, hallucination, refusal behavior and unsafe medication/dosing answers. |
 | Dashboard | Interactive sample history is exploratory, not a full-test-set or clinical benchmark. |
-| Security | Session isolation, admin protection, private media handling and deployment configuration need hardening. Separate local security fixes are not included in this documentation update. |
+| Security | Session isolation, admin authentication, validated/private media, Markdown sanitization, trusted hosts and basic request throttling are implemented. Full application/provider testing and deployment hardening remain outstanding. |
 
 > **Research use only.** Not a medical device or substitute for professional diagnosis or treatment. Do not upload sensitive or identifiable patient data to an unreviewed deployment. Images or text may be sent to external AI providers depending on the processing path.
+
+## Security checks and deployment limits
+
+```bash
+python test_security.py
+```
+
+The regression suite exercises security helpers and selected actual route functions with ML/provider initialization excluded. It is not a full end-to-end or penetration test.
+
+- Uploads: JPEG/PNG verification, an 8 MiB request limit, a 20-million-pixel cap, random filenames, metadata-stripping re-encoding and deletion after processing.
+- Private generated audio: session-owned access; old public media paths are blocked by Flask. Delete old public files as appropriate and make sure a reverse proxy cannot bypass Flask.
+- Browser protections: signed sessions, HttpOnly/SameSite cookies, cross-origin state-changing request rejection, HTML sanitization, trusted-host checks and debug disabled.
+- Admin authentication: disabled without credentials; HTTP Basic auth requires HTTPS outside localhost.
+- State/limits: history, audio ownership, metrics and request throttling remain in-process. Use shared storage, bounded retention, shared rate limiting, HTTPS and a production WSGI server before public deployment. Do not infer production readiness from passing these tests.
+- Hostnames: update `TRUSTED_HOSTS` to your actual deployment hostname; never use a wildcard. Direct API clients must send a trusted Origin header for state-changing requests.
 
 ## Selected research context
 
