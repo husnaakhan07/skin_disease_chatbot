@@ -12,7 +12,7 @@ except ImportError:
     import kagglehub
 
 # 1. AUTHENTICATION
-os.environ['KAGGLE_API_TOKEN'] = 'KGAT_62e550101568108988a6cb1fee981796'
+# Kaggle authentication comes from the environment; never commit tokens.
 
 # 2. CONFIGURATION
 datasets = [
